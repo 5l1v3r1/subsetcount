@@ -21,6 +21,7 @@ def transformer_layer(inputs, num_heads=8, hidden=2048, activation=tf.nn.relu, s
       scope: the variable scope name.
     """
     inner_dim = inputs.get_shape()[-1].value
+    assert not inner_dim % num_heads, 'number of heads must divide d_model'
     with tf.variable_scope(None, default_name=scope):
         # pylint: disable=E1101
         outs = masked_attention(inputs, num_heads=num_heads)
@@ -30,6 +31,8 @@ def transformer_layer(inputs, num_heads=8, hidden=2048, activation=tf.nn.relu, s
         outs = tf.layers.dense(outs, hidden, activation=activation)
         outs = tf.layers.dense(outs, inner_dim, activation=activation)
         outs = tf.contrib.layers.layer_norm(pre_fc + outs, center=True, scale=True)
+
+        return outs
 
 
 def masked_attention(inputs, num_heads=8, scope='attention'):
@@ -53,7 +56,8 @@ def masked_attention(inputs, num_heads=8, scope='attention'):
         logits += upper_triangular(timesteps, dtype=logits.dtype)
         weights = tf.nn.softmax(logits)
         weighted_sum = tf.matmul(weights, values)
-        return mix_heads(weighted_sum)
+        combined = combine_heads(weighted_sum)
+        return tf.layers.dense(combined, inner_dim, name='mix_heads')
 
 
 def split_heads(inputs, num_heads):
@@ -70,13 +74,14 @@ def split_heads(inputs, num_heads):
     inner_dim = inputs.get_shape()[-1].value
     assert not inner_dim % num_heads
     split_dim = inner_dim // num_heads
-    shaped = tf.reshape(inputs, optimized_shape(inputs)[:-1] + [num_heads, split_dim])
+    shaped = tf.reshape(inputs, optimized_shape(inputs)[:-1] + (num_heads, split_dim))
     return tf.transpose(shaped, [0, 2, 1, 3])
 
 
-def mix_heads(keys):
+def combine_heads(keys):
     """
-    Mix the results of each head in multi-head attention.
+    Combine the results of the heads in multi-head
+    attention.
 
     Args:
       keys: a [batch x heads x timesteps x N/heads] Tensor.
@@ -86,8 +91,7 @@ def mix_heads(keys):
     """
     batch, heads, timesteps, n_over_heads = optimized_shape(keys)
     moved = tf.transpose(keys, [0, 2, 1, 3])
-    combined = tf.reshape(moved, [batch, timesteps, heads * n_over_heads])
-    return tf.layers.dense(combined, heads * n_over_heads, name='mix_heads')
+    return tf.reshape(moved, [batch, timesteps, heads * n_over_heads])
 
 
 def upper_triangular(size, value=-np.inf, dtype=tf.float32):
