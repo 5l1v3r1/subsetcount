@@ -25,12 +25,14 @@ def transformer_layer(inputs, num_heads=8, hidden=2048, activation=tf.nn.relu, s
     with tf.variable_scope(None, default_name=scope):
         # pylint: disable=E1101
         outs = masked_attention(inputs, num_heads=num_heads)
-        outs = tf.contrib.layers.layer_norm(inputs + outs, center=True, scale=True)
+        outs = tf.contrib.layers.layer_norm(inputs + outs, center=True, scale=True,
+                                            begin_norm_axis=-1)
 
         pre_fc = outs
         outs = tf.layers.dense(outs, hidden, activation=activation)
         outs = tf.layers.dense(outs, inner_dim, activation=activation)
-        outs = tf.contrib.layers.layer_norm(pre_fc + outs, center=True, scale=True)
+        outs = tf.contrib.layers.layer_norm(pre_fc + outs, center=True, scale=True,
+                                            begin_norm_axis=-1)
 
         return outs
 
