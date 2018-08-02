@@ -38,10 +38,9 @@ def main():
         for i in range(args.context_size):
             cur_samples, cur_raw_samples = sess.run([samples, raw_samples],
                                                     feed_dict={sequence: cur_sequence})
-            if i + 1 < args.context_size:
-                cur_sequence[i + 1] = cur_samples[i]
-            sys.stderr.write(str(bytes([cur_raw_samples[i]]), 'utf-8'))
-            sys.stderr.flush()
+            cur_sequence[i] = cur_samples[i]
+            sys.stderr.buffer.write(bytes([cur_raw_samples[i]]))
+            sys.stderr.buffer.flush()
 
 
 def arg_parser():

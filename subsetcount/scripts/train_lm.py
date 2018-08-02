@@ -27,7 +27,7 @@ def main():
             outputs = transformer_layer(outputs)
 
     logits = tf.layers.dense(outputs, 256, name='softmax', activation=None)
-    losses = tf.nn.softmax_cross_entropy_with_logits(labels=batch, logits=logits)
+    losses = tf.nn.softmax_cross_entropy_with_logits_v2(labels=batch, logits=logits)
     loss = tf.reduce_mean(losses)
 
     optimize = tf.train.AdamOptimizer(learning_rate=args.lr).minimize(loss)
