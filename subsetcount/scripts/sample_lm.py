@@ -19,7 +19,8 @@ def main():
     cur_sequence = np.zeros((args.context_size, 256), dtype='float32')
 
     outputs = tf.concat([tf.zeros_like(sequence[:, :1]), sequence[:, :-1]], axis=1)
-    outputs = tf.layers.dense(outputs, args.dimension, name='embed')
+    outputs = tf.layers.dense(outputs, args.dimension, name='embed',
+                              kernel_initializer=tf.truncated_normal_initializer())
     outputs += positional_encoding(args.context_size, args.dimension)
     outputs = tf.expand_dims(outputs, axis=0)
     with tf.variable_scope('model'):

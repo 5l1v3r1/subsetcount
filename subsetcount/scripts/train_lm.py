@@ -19,7 +19,8 @@ def main():
     batch = dataset.batch(args.batch).make_one_shot_iterator().get_next()
 
     outputs = tf.concat([tf.zeros_like(batch[:, :1]), batch[:, :-1]], axis=1)
-    outputs = tf.layers.dense(outputs, args.dimension, name='embed')
+    outputs = tf.layers.dense(outputs, args.dimension, name='embed',
+                              kernel_initializer=tf.truncated_normal_initializer())
     outputs += positional_encoding(args.context_size, args.dimension)
     with tf.variable_scope('model'):
         for _ in range(5):
