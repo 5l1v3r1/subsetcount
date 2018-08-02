@@ -18,7 +18,7 @@ def main():
     sequence = tf.placeholder(tf.float32, shape=(args.context_size, 256))
     cur_sequence = np.zeros((args.context_size, 256), dtype='float32')
 
-    outputs = tf.concat([tf.zeros_like(sequence[:, :1]), sequence[:, :-1]], axis=1)
+    outputs = tf.concat([tf.zeros_like(sequence[:1]), sequence[:-1]], axis=0)
     outputs = tf.layers.dense(outputs, args.dimension, name='embed',
                               kernel_initializer=tf.truncated_normal_initializer())
     outputs += positional_encoding(args.context_size, args.dimension)
