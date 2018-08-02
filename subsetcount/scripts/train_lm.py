@@ -40,7 +40,7 @@ def main():
         while True:
             cur_step, cur_loss, _ = sess.run([inc_step, loss, optimize])
             print('step %d: loss=%f' % (cur_step, cur_loss))
-            if cur_step % 100 == 0:
+            if cur_step % args.save_interval == 0:
                 save_vars(sess, args.model, var_list=tf.global_variables())
 
 
@@ -67,6 +67,7 @@ def arg_parser():
 
     parser.add_argument('--batch', help='batch size', type=int, default=16)
     parser.add_argument('--lr', help='learning rate', type=float, default=1e-3)
+    parser.add_argument('--save-interval', help='steps per save', type=int, default=10)
 
     parser.add_argument('corpus', help='A text file where data is gathered from')
     return parser
