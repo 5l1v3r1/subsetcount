@@ -125,3 +125,22 @@ def test_regressions():
             # }
             # with open(path, 'wb+') as out_file:
             #     pickle.dump(obj, out_file)
+
+
+def test_positional_encoding():
+    with tf.Graph().as_default():
+        with tf.Session() as sess:
+            def _make_row(idx):
+                return [
+                    np.cos(idx / 3 ** (0.0 / 6.0)),
+                    np.sin(idx / 3 ** (0.0 / 6.0)),
+                    np.cos(idx / 3 ** (2.0 / 6.0)),
+                    np.sin(idx / 3 ** (2.0 / 6.0)),
+                    np.cos(idx / 3 ** (4.0 / 6.0)),
+                    np.sin(idx / 3 ** (4.0 / 6.0)),
+                ]
+            actual = sess.run(transformer.positional_encoding(5, 6, base=3, dtype=tf.float64))
+            expected = np.array([_make_row(i) for i in range(5)], dtype='float64')
+            assert actual.shape == expected.shape
+            assert np.allclose(actual, expected)
+            assert not np.isnan(actual).any()

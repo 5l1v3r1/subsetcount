@@ -37,6 +37,29 @@ def transformer_layer(inputs, num_heads=8, hidden=2048, activation=tf.nn.relu, s
         return outs
 
 
+def positional_encoding(timesteps, inner_dim, base=10000, dtype=tf.float32):
+    """
+    Compute the sinusoidal positional encoding for the
+    sequence dimensions.
+
+    Args:
+      timesteps: the number of timesteps. Either a Tensor
+        or an integer.
+      inner_dim: the size of the inner vector. An integer.
+      base: a parameter controlling the max wavelength.
+      dtype: the dtype of the resulting Tensor.
+
+    Returns:
+      A [timesteps x inner_dim] Tensor which is meant to
+        be added to the inputs.
+    """
+    positions = tf.cast(tf.expand_dims(tf.range(timesteps), axis=-1), dtype)
+    dimensions = tf.cast(tf.expand_dims((tf.range(inner_dim) // 2) * 2, axis=0), dtype)
+    arguments = positions / tf.pow(tf.constant(base, dtype=dtype), dimensions / inner_dim)
+    sin_mask = tf.tile(tf.expand_dims(tf.range(inner_dim), axis=0), [timesteps, 1])
+    return tf.where(tf.equal((sin_mask % 2), 0), tf.cos(arguments), tf.sin(arguments))
+
+
 def masked_attention(inputs, num_heads=8, scope='attention'):
     """
     Perform masked multi-head attention over a sequence.
