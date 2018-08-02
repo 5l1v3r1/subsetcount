@@ -3,7 +3,6 @@ Sample from a character-level language model.
 """
 
 import argparse
-import random
 import sys
 
 from anyrl.utils.tf_state import load_vars
