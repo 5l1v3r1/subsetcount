@@ -39,8 +39,7 @@ def main():
             cur_samples, cur_raw_samples = sess.run([samples, raw_samples],
                                                     feed_dict={sequence: cur_sequence})
             cur_sequence[i] = cur_samples[i]
-            sys.stderr.buffer.write(bytes([cur_raw_samples[i]]))
-            sys.stderr.buffer.flush()
+            sys.stdout.buffer.write(bytes([cur_raw_samples[i]]))
 
 
 def arg_parser():
