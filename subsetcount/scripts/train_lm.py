@@ -67,7 +67,7 @@ def arg_parser():
     parser.add_argument('--context-size', help='bytes per datapoint', type=int, default=128)
 
     parser.add_argument('--batch', help='batch size', type=int, default=16)
-    parser.add_argument('--lr', help='learning rate', type=float, default=1e-3)
+    parser.add_argument('--lr', help='learning rate', type=float, default=1e-4)
     parser.add_argument('--save-interval', help='steps per save', type=int, default=10)
 
     parser.add_argument('corpus', help='A text file where data is gathered from')
