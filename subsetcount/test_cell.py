@@ -2,6 +2,8 @@
 Tests for the Transformer RNNCell.
 """
 
+import pytest
+
 import numpy as np
 import tensorflow as tf
 
@@ -65,7 +67,8 @@ def test_sequence_masks():
             assert (actual == expected).all()
 
 
-def test_basic_equivalence():
+@pytest.mark.parametrize('num_layers', [1, 2, 6])
+def test_basic_equivalence(num_layers):
     """
     Test that both transformer implementations produce the
     same outputs when applied to a properly-sized
@@ -78,12 +81,13 @@ def test_basic_equivalence():
                                      shape=(3, 4, 6),
                                      initializer=tf.truncated_normal_initializer(),
                                      dtype=tf.float64)
-            cell = TransformerCell(pos_enc, num_heads=2, hidden=24)
+            cell = TransformerCell(pos_enc, num_layers=num_layers, num_heads=2, hidden=24)
             actual, _ = tf.nn.dynamic_rnn(cell, in_seq, dtype=tf.float64)
             with tf.variable_scope('rnn', reuse=True):
                 with tf.variable_scope('transformer_cell', reuse=True):
-                    expected = transformer_layer(in_seq + pos_enc, num_heads=2, hidden=24)
-                    expected = transformer_layer(expected, num_heads=2, hidden=24)
+                    expected = in_seq + pos_enc
+                    for _ in range(num_layers):
+                        expected = transformer_layer(expected, num_heads=2, hidden=24)
             sess.run(tf.global_variables_initializer())
 
             actual, expected = sess.run((actual, expected))

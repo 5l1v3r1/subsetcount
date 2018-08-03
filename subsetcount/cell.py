@@ -158,8 +158,7 @@ class TransformerCell(RNNCell):
         """
         batch_size = optimized_shape(timestep_idxs)[0]
         with tf.variable_scope(None, default_name=scope):
-            projected = tf.layers.dense(inputs, self.output_size * 3,
-                                        name='key_query_value')
+            projected = tf.layers.dense(inputs, self.output_size * 3, name='key_query_value')
             projected = tf.expand_dims(projected, axis=1)
 
             # Resulting shape: [batch x 1 x N]
@@ -176,7 +175,7 @@ class TransformerCell(RNNCell):
             split_queries = split_heads(next_queries, self.num_heads)[:, :, 0]
 
             attended = self.raw_attention(timestep_idxs, split_keys, split_values, split_queries)
-            combined = tf.reshape(tf.transpose(attended, [0, 2, 1]), [batch_size, self.output_size])
+            combined = tf.reshape(attended, [batch_size, self.output_size])
             mixed = tf.layers.dense(combined, self.output_size, name='mix_heads')
 
             return (shift_overflows(timestep_idxs, keys),
@@ -208,7 +207,7 @@ class TransformerCell(RNNCell):
 
         # Resulting shape: [batch x heads x 1 x max_timestep]
         logits = tf.matmul(expanded_queries, tf.transpose(keys[:, :, :max_timestep], [0, 1, 3, 2]))
-        logits /= sqrt(self.output_size)
+        logits /= sqrt(keys.get_shape()[-1].value)
         logits += tf.reshape(sequence_masks(timestep_idxs, max_timestep, logits.dtype),
                              [batch_size, 1, 1, max_timestep])
         weights = tf.nn.softmax(logits)
