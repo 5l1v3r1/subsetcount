@@ -293,6 +293,6 @@ def sequence_masks(timestep_idxs, sequence_length, dtype):
     """
     batch_size = optimized_shape(timestep_idxs)[0]
     indices = tf.tile(tf.expand_dims(tf.range(sequence_length), axis=0), [batch_size, 1])
-    greater = (tf.expand_dims(timestep_idxs, axis=-1) > indices)
+    greater = (tf.expand_dims(timestep_idxs, axis=-1) >= indices)
     zeros = tf.zeros([batch_size, sequence_length], dtype=dtype)
-    return tf.where(greater, zeros - np.inf, zeros)
+    return tf.where(greater, zeros, zeros - np.inf)

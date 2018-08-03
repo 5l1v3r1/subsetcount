@@ -6,7 +6,63 @@ import numpy as np
 import tensorflow as tf
 
 from .transformer import positional_encoding, transformer_layer
-from .cell import TransformerCell
+from .cell import TransformerCell, inject_at_timestep, sequence_masks
+
+
+def test_inject_at_timestep():
+    with tf.Graph().as_default():
+        with tf.Session() as sess:
+            in_seq = tf.constant(np.array([
+                [
+                    [1, 2, 3, 4],
+                    [5, 6, 7, 8],
+                ],
+                [
+                    [9, 10, 11, 12],
+                    [13, 14, 15, 16],
+                ],
+                [
+                    [17, 18, 19, 20],
+                    [21, 22, 23, 24],
+                ],
+            ], dtype='float32'))
+            injection = tf.constant(np.array([
+                [-1, -2, -3, -4],
+                [-5, -6, -7, -8],
+                [-9, -10, -11, -12],
+            ], dtype='float32'))
+
+            indices = np.array([0, 1, 0], dtype='int32')
+            injected = sess.run(inject_at_timestep(indices, in_seq, injection))
+
+            expected = np.array([
+                [
+                    [-1, -2, -3, -4],
+                    [5, 6, 7, 8],
+                ],
+                [
+                    [9, 10, 11, 12],
+                    [-5, -6, -7, -8],
+                ],
+                [
+                    [-9, -10, -11, -12],
+                    [21, 22, 23, 24],
+                ],
+            ], dtype='float32')
+            assert (injected == expected).all()
+
+
+def test_sequence_masks():
+    with tf.Graph().as_default():
+        with tf.Session() as sess:
+            indices = tf.constant(np.array([3, 1, 2], dtype='int32'))
+            actual = sess.run(sequence_masks(indices, tf.constant(4, dtype=tf.int32), tf.float32))
+            expected = np.array([
+                [0, 0, 0, 0],
+                [0, 0, -np.inf, -np.inf],
+                [0, 0, 0, -np.inf],
+            ], dtype='float32')
+            assert (actual == expected).all()
 
 
 def test_basic_equivalence():
