@@ -165,8 +165,8 @@ class TransformerCell(RNNCell):
             # Resulting shape: [batch x 1 x N]
             next_keys, next_queries, next_values = tf.split(projected, 3, axis=-1)
 
-            keys = inject_at_timestep(timestep_idxs, keys, next_keys[0, :])
-            values = inject_at_timestep(timestep_idxs, values, next_values[0, :])
+            keys = inject_at_timestep(timestep_idxs, keys, next_keys[:, 0])
+            values = inject_at_timestep(timestep_idxs, values, next_values[:, 0])
 
             # Resulting shape: [batch x heads x timesteps x N/heads]
             split_keys = split_heads(keys, self.num_heads)
