@@ -14,25 +14,16 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.contrib.rnn import RNNCell  # pylint: disable=E0611
 
-from .transformer import split_heads, optimized_shape
+from .transformer import optimized_shape, split_heads, transformer_layer
 
 # Disable warning about "compute_output_shape" not being
 # overridden, since most RNNCells don't seem to do so.
 # pylint: disable=W0223
 
 
-class TransformerCell(RNNCell):
+class BaseTransformerCell(RNNCell):
     """
-    An RNNCell that implements a Transformer.
-
-    Back-propagation through this RNN is not efficient,
-    since it is not properly batched.
-    However, the forward pass is as fast as it could be.
-
-    State tuples are of the form:
-
-        (current_step, keys_1, values_1, keys_2, values_2, ...)
-
+    Base class for RNNCells that implement Transformers.
     """
 
     def __init__(self,
@@ -42,7 +33,7 @@ class TransformerCell(RNNCell):
                  hidden=2048,
                  fc_activation=tf.nn.relu,
                  trainable=True,
-                 name=None,
+                 name='transformer',
                  dtype=None):
         """
         Create a new Transformer cell.
@@ -60,7 +51,7 @@ class TransformerCell(RNNCell):
           name: the scope name.
           dtype: the datatype.
         """
-        super(TransformerCell, self).__init__(trainable=trainable, name=name, dtype=dtype)
+        super(BaseTransformerCell, self).__init__(trainable=trainable, name=name, dtype=dtype)
         self.pos_encoding = pos_encoding
         self.num_layers = num_layers
         self.num_heads = num_heads
@@ -76,22 +67,66 @@ class TransformerCell(RNNCell):
         return self.pos_encoding.get_shape()[0].value
 
     @property
-    def state_size(self):
-        return [tf.TensorShape(())] + [self.pos_encoding.get_shape()] * 2 * self.num_layers
-
-    @property
     def output_size(self):
         return self.pos_encoding.get_shape()[1].value
 
     def zero_state(self, batch_size, dtype):
-        zero_pos = tf.zeros(batch_size, dtype=dtype)
-        zeros = tf.zeros([batch_size, self.time_horizon, self.output_size], dtype=dtype)
-        return (zero_pos,) + (zeros,) * (self.num_layers * 2)
+        return tuple(tf.zeros([batch_size] + [x.value for x in shape.dims], dtype=dtype)
+                     for shape in self.state_size)
+
+
+class UnlimitedTransformerCell(BaseTransformerCell):
+    """
+    An RNNCell that implements a Transformer in a way that
+    supports arbitrarily long sequences, but is not
+    efficient for sequences shorter than the horizon.
+    """
+    @property
+    def state_size(self):
+        return [tf.TensorShape(()), self.pos_encoding.get_shape()]
 
     def call(self, inputs, state):  # pylint: disable=W0221
         timestep_idxs = tf.cast(state[0], tf.int32)
-        layer_inputs = inputs + tf.gather(self.pos_encoding, timestep_idxs)
-        new_states = [tf.clip_by_value(state[0] + 1.0, 0, self.time_horizon - 1)]
+        full_inputs = inject_at_timestep(timestep_idxs, state[1], inputs)
+        new_states = [tf.clip_by_value(state[0] + 1.0, 0, self.time_horizon - 1),
+                      shift_overflows(timestep_idxs, full_inputs)]
+        outputs = full_inputs + self.pos_encoding
+        outputs = outputs[:, :tf.reduce_max(timestep_idxs) + 1]
+        for _ in range(self.num_layers):
+            outputs = transformer_layer(outputs, num_heads=self.num_heads, hidden=self.hidden,
+                                        activation=self.fc_activation)
+        batch_size = optimized_shape(outputs)[0]
+        outputs = tf.gather_nd(outputs,
+                               tf.stack([tf.range(batch_size, dtype=tf.int32), timestep_idxs],
+                                        axis=-1))
+        return outputs, tuple(new_states)
+
+
+class LimitedTransformerCell(BaseTransformerCell):
+    """
+    An RNNCell that implements a Transformer, but does not
+    support sequences longer than the horizon.
+
+    Back-propagation through this RNN is not efficient,
+    since it is not properly batched.
+    However, the forward pass is as fast as it could be.
+
+    State tuples are of the form:
+
+        (current_step, keys_1, values_1, keys_2, values_2, ...)
+
+    """
+    @property
+    def state_size(self):
+        return [tf.TensorShape(())] + [self.pos_encoding.get_shape()] * 2 * self.num_layers
+
+    def call(self, inputs, state):  # pylint: disable=W0221
+        timestep_idxs = tf.cast(state[0], tf.int32)
+        assert_op = tf.Assert(tf.reduce_any(timestep_idxs < self.time_horizon),
+                              ['LimitedTransformerCell time horizon exceeded'])
+        with tf.control_dependencies([assert_op]):
+            layer_inputs = inputs + tf.gather(self.pos_encoding, timestep_idxs)
+            new_states = [state[0] + 1.0]
         for layer_idx in range(self.num_layers):
             keys = state[1 + layer_idx * 2]
             values = state[2 + layer_idx * 2]
@@ -178,9 +213,7 @@ class TransformerCell(RNNCell):
             combined = tf.reshape(attended, [batch_size, self.output_size])
             mixed = tf.layers.dense(combined, self.output_size, name='mix_heads')
 
-            return (shift_overflows(timestep_idxs, keys),
-                    shift_overflows(timestep_idxs, values),
-                    mixed)
+            return (keys, values, mixed)
 
     def raw_attention(self, timestep_idxs, keys, values, queries):
         """

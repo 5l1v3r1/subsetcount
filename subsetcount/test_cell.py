@@ -8,7 +8,8 @@ import numpy as np
 import tensorflow as tf
 
 from .transformer import positional_encoding, transformer_layer
-from .cell import TransformerCell, inject_at_timestep, sequence_masks
+from .cell import (LimitedTransformerCell, UnlimitedTransformerCell,
+                   inject_at_timestep, sequence_masks)
 
 
 def test_inject_at_timestep():
@@ -67,8 +68,9 @@ def test_sequence_masks():
             assert (actual == expected).all()
 
 
+@pytest.mark.parametrize('cell_cls', [LimitedTransformerCell, UnlimitedTransformerCell])
 @pytest.mark.parametrize('num_layers', [1, 2, 6])
-def test_basic_equivalence(num_layers):
+def test_basic_equivalence(cell_cls, num_layers):
     """
     Test that both transformer implementations produce the
     same outputs when applied to a properly-sized
@@ -81,13 +83,48 @@ def test_basic_equivalence(num_layers):
                                      shape=(3, 4, 6),
                                      initializer=tf.truncated_normal_initializer(),
                                      dtype=tf.float64)
-            cell = TransformerCell(pos_enc, num_layers=num_layers, num_heads=2, hidden=24)
+            cell = cell_cls(pos_enc, num_layers=num_layers, num_heads=2, hidden=24)
             actual, _ = tf.nn.dynamic_rnn(cell, in_seq, dtype=tf.float64)
             with tf.variable_scope('rnn', reuse=True):
-                with tf.variable_scope('transformer_cell', reuse=True):
+                with tf.variable_scope('transformer', reuse=True):
                     expected = in_seq + pos_enc
                     for _ in range(num_layers):
                         expected = transformer_layer(expected, num_heads=2, hidden=24)
+            sess.run(tf.global_variables_initializer())
+
+            actual, expected = sess.run((actual, expected))
+
+            assert not np.isnan(actual).any()
+            assert not np.isnan(expected).any()
+            assert actual.shape == expected.shape
+            assert np.allclose(actual, expected)
+
+
+@pytest.mark.parametrize('cell_cls', [UnlimitedTransformerCell])
+def test_past_horizon(cell_cls):
+    """
+    Test the cell when the input sequence is longer than
+    the time horizon.
+    """
+    with tf.Graph().as_default():
+        with tf.Session() as sess:
+            pos_enc = positional_encoding(4, 6, dtype=tf.float64)
+            in_seq = tf.get_variable('in_seq',
+                                     shape=(3, 5, 6),
+                                     initializer=tf.truncated_normal_initializer(),
+                                     dtype=tf.float64)
+            cell = cell_cls(pos_enc, num_layers=3, num_heads=2, hidden=24)
+            actual, _ = tf.nn.dynamic_rnn(cell, in_seq, dtype=tf.float64)
+
+            def apply_regular(sequence):
+                with tf.variable_scope('rnn', reuse=True):
+                    with tf.variable_scope('transformer', reuse=True):
+                        expected = sequence + pos_enc
+                        for _ in range(3):
+                            expected = transformer_layer(expected, num_heads=2, hidden=24)
+                return expected
+            expected = tf.concat([apply_regular(in_seq[:, :-1]),
+                                  apply_regular(in_seq[:, 1:])[:, -1:]], axis=1)
             sess.run(tf.global_variables_initializer())
 
             actual, expected = sess.run((actual, expected))
