@@ -115,10 +115,10 @@ class TransformerCell(RNNCell):
           inputs: the inputs for the current timesteps.
 
         Returns:
-          A tuple (outputs, new_keys, new_values):
-            outputs: a [batch x N] Tensor from the layer.
+          A tuple (new_keys, new_values, outputs):
             new_keys: the new key history.
             new_values: the new value history.
+            outputs: a [batch x N] Tensor from the layer.
         """
         with tf.variable_scope(None, default_name=scope):
             # pylint: disable=E1101
@@ -151,10 +151,10 @@ class TransformerCell(RNNCell):
           scope: the scope name.
 
         Returns:
-          A tuple (outputs, new_keys, new_values):
-            outputs: a [batch x N] Tensor from the layer.
+          A tuple (new_keys, new_values, outputs):
             new_keys: the new key history.
             new_values: the new value history.
+            outputs: a [batch x N] Tensor from the layer.
         """
         batch_size = optimized_shape(timestep_idxs)[0]
         with tf.variable_scope(None, default_name=scope):
