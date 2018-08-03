@@ -104,7 +104,7 @@ class TransformerCell(RNNCell):
             new_states.extend([new_keys, new_values])
         return layer_inputs, tuple(new_states)
 
-    def transformer_layer(self, timestep_idxs, keys, values, inputs):
+    def transformer_layer(self, timestep_idxs, keys, values, inputs, scope='transformer'):
         """
         Apply a layer of the transformer for a timestep.
 
@@ -120,23 +120,24 @@ class TransformerCell(RNNCell):
             new_keys: the new key history.
             new_values: the new value history.
         """
-        # pylint: disable=E1101
-        new_keys, new_values, outputs = self.attention_layer(
-            timestep_idxs,
-            keys,
-            values,
-            inputs,
-        )
-        inputs = tf.contrib.layers.layer_norm(inputs + outputs,
-                                              center=True,
-                                              scale=True,
-                                              begin_norm_axis=-1)
-        outputs = self.fc_layer(inputs)
-        inputs = tf.contrib.layers.layer_norm(inputs + outputs,
-                                              center=True,
-                                              scale=True,
-                                              begin_norm_axis=-1)
-        return new_keys, new_values, inputs
+        with tf.variable_scope(None, default_name=scope):
+            # pylint: disable=E1101
+            new_keys, new_values, outputs = self.attention_layer(
+                timestep_idxs,
+                keys,
+                values,
+                inputs,
+            )
+            inputs = tf.contrib.layers.layer_norm(inputs + outputs,
+                                                  center=True,
+                                                  scale=True,
+                                                  begin_norm_axis=-1)
+            outputs = self.fc_layer(inputs)
+            inputs = tf.contrib.layers.layer_norm(inputs + outputs,
+                                                  center=True,
+                                                  scale=True,
+                                                  begin_norm_axis=-1)
+            return new_keys, new_values, inputs
 
     def attention_layer(self, timestep_idxs, keys, values, inputs, scope='attention'):
         """
@@ -176,10 +177,11 @@ class TransformerCell(RNNCell):
 
             attended = self.raw_attention(timestep_idxs, split_keys, split_values, split_queries)
             combined = tf.reshape(tf.transpose(attended, [0, 2, 1]), [batch_size, self.output_size])
+            mixed = tf.layers.dense(combined, self.output_size, name='mix_heads')
 
             return (shift_overflows(timestep_idxs, keys),
                     shift_overflows(timestep_idxs, values),
-                    combined)
+                    mixed)
 
     def raw_attention(self, timestep_idxs, keys, values, queries):
         """
@@ -198,16 +200,17 @@ class TransformerCell(RNNCell):
         Returns:
           A [batch x heads x N/heads] Tensor.
         """
-        max_timestep = tf.reduce_max(timestep_idxs)
+        max_timestep = tf.reduce_max(timestep_idxs) + 1
+        batch_size = optimized_shape(queries)[0]
 
         # Resulting shape: [batch x heads x 1 x N/heads]
         expanded_queries = tf.expand_dims(queries, axis=2)
 
         # Resulting shape: [batch x heads x 1 x max_timestep]
         logits = tf.matmul(expanded_queries, tf.transpose(keys[:, :, :max_timestep], [0, 1, 3, 2]))
-        logits = logits[:, :, 0]
         logits /= sqrt(self.output_size)
-        logits += sequence_masks(timestep_idxs, max_timestep, logits.dtype)
+        logits += tf.reshape(sequence_masks(timestep_idxs, max_timestep, logits.dtype),
+                             [batch_size, 1, 1, max_timestep])
         weights = tf.nn.softmax(logits)
 
         # Resulting shape: [batch x heads x 1 x N/heads]
@@ -247,7 +250,7 @@ def inject_at_timestep(timestep_idxs, sequence, new_values):
       A [batch x timestep x N] sequence.
     """
     # Create a [batch x timestep] Tensor of timesteps.
-    ranges = tf.range(tf.shape(sequence)[0], dtype=timestep_idxs.dtype)
+    ranges = tf.range(optimized_shape(sequence)[1], dtype=timestep_idxs.dtype)
     ranges = tf.tile(tf.expand_dims(ranges, axis=0), [tf.shape(sequence)[0], 1])
 
     # Create a mask of shape [batch x timestep x N].
