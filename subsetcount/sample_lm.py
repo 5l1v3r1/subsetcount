@@ -9,7 +9,7 @@ from anyrl.utils.tf_state import load_vars
 import numpy as np
 import tensorflow as tf
 
-from subsetcount.transformer import positional_encoding, transformer_layer
+from xformer import positional_encoding, transformer_layer
 
 
 def main():

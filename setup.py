@@ -10,10 +10,11 @@ setup(
     license='BSD',
     install_requires=[
         'numpy>=1.0.0,<2.0.0',
-        'anyrl>=0.12.13,<0.13.0'
+        'anyrl>=0.12.13,<0.13.0',
+        'xformer>=1.0.0,<2.0.0',
     ],
     extras_require={
         "tf": ["tensorflow>=1.0.0"],
         "tf_gpu": ["tensorflow-gpu>=1.0.0"],
-    }
+    },
 )
