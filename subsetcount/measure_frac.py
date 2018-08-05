@@ -31,7 +31,8 @@ def main():
             for prob in probs:
                 count += 1.0
                 log_sum = np.logaddexp(log_sum, prob)
-            print('count %d: log_prob=%f' % (int(count), log_sum - np.log(count)))
+            log_prob = log_sum - np.log(count)
+            print('count %d: log_prob=%f prob=%f' % (int(count), log_prob, np.exp(log_prob)))
 
 
 def subset_probs(dimension, context_size, character_mask, batch_size=32):
