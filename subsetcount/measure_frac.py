@@ -65,7 +65,7 @@ def subset_probs(dimension, context_size, character_mask, batch_size=32):
         logits = tf.layers.dense(outputs, 256, name='softmax', activation=None)
 
         all_probs = tf.nn.log_softmax(logits)
-        neg_inf = tf.negative(tf.zeros_like(logits) * np.inf)
+        neg_inf = tf.negative(tf.ones_like(logits) * np.inf)
         allowed_probs = tf.where(mask, all_probs, neg_inf)
         log_probs += tf.reduce_logsumexp(allowed_probs, axis=-1)
 
