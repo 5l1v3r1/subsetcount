@@ -67,7 +67,7 @@ def subset_probs(dimension, context_size, character_mask, batch_size=32):
         all_probs = tf.nn.log_softmax(logits)
         neg_inf = tf.negative(tf.zeros_like(logits) * np.inf)
         allowed_probs = tf.where(mask, all_probs, neg_inf)
-        log_probs += tf.reduce_sum(allowed_probs, axis=-1)
+        log_probs += tf.reduce_logsumexp(allowed_probs, axis=-1)
 
         masked_logits = tf.where(mask, logits, neg_inf)
         dist = tf.distributions.Categorical(logits=masked_logits)
