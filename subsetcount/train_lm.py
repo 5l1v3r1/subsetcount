@@ -22,9 +22,10 @@ def main():
     outputs = tf.layers.dense(outputs, args.dimension, name='embed',
                               kernel_initializer=tf.truncated_normal_initializer())
     outputs += positional_encoding(args.context_size, args.dimension)
-    with tf.variable_scope('model'):
-        for _ in range(5):
-            outputs = transformer_layer(outputs)
+    with tf.variable_scope('rnn'):
+        with tf.variable_scope('transformer'):
+            for _ in range(5):
+                outputs = transformer_layer(outputs)
 
     logits = tf.layers.dense(outputs, 256, name='softmax', activation=None)
     losses = tf.nn.softmax_cross_entropy_with_logits_v2(labels=batch, logits=logits)
