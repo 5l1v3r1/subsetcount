@@ -8,7 +8,6 @@ import sys
 from anyrl.utils.tf_state import load_vars
 import numpy as np
 import tensorflow as tf
-
 from xformer import LimitedTransformerCell, positional_encoding
 
 

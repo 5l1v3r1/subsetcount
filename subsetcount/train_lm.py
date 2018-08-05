@@ -8,7 +8,6 @@ import random
 from anyrl.utils.tf_state import load_vars, save_vars
 import numpy as np
 import tensorflow as tf
-
 from xformer import positional_encoding, transformer_layer
 
 
